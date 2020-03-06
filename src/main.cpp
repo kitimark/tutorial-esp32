@@ -3,8 +3,12 @@
 #include "ESPAsyncWebServer.h"
 #include "SPIFFS.h"
 
-const char* ssid     = "3BB_PANAT_plus";
-const char* password = "0828923625";
+const char* ssid_ap     = "ESP32-Access-Point";
+const char* password_ap = NULL;
+
+const char* ssid_wifi     = "3BB_PANAT_plus";
+const char* password_wifi = "0828923625";
+int input;
 
 String output26State = "off";
 String output27State = "off";
@@ -22,23 +26,42 @@ void setup() {
     return;
   }
 
-  WiFi.begin(ssid,password);
+  // select mode
+  while(input != 1 && input != 2) {
+    Serial.print("Mode: ");
+    while(!Serial.available());
+    input = Serial.readStringUntil('\n').toInt();
+  }
 
+  if (input == 1) {
+    Serial.print("Setting AP (Access Point)…");
+    // Remove the password parameter, if you want the AP (Access Point) to be open
+    WiFi.softAP(ssid_ap, password_ap);
+
+    IPAddress IP = WiFi.softAPIP();
+    Serial.print("AP IP address: ");
+    Serial.println(IP);
+  }
+  if (input == 2) {
+    WiFi.begin(ssid_wifi, password_wifi);
+
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(1000);
+      Serial.println("Connecting to WiFi..");
+    }
+  
+    Serial.println("Connnected...");
+    Serial.println(WiFi.localIP()); 
+  }
+
+
+  // init led 
   pinMode(26, OUTPUT);
   pinMode(27, OUTPUT);
   digitalWrite(26, LOW);
   digitalWrite(27, LOW);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.println("Connecting to WiFi..");
-  }
-  
-  Serial.println("Connnected...");
-
-  Serial.println(WiFi.localIP()); 
-
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/led", HTTP_GET, [](AsyncWebServerRequest *request){
     AsyncResponseStream *response = request->beginResponseStream("text/html");
 
     if (request->hasParam("26")) {
@@ -80,21 +103,21 @@ void setup() {
     response->println("<p>RED 26 - State " + output26State + "</p>");
     // If the output26State is off, it displays the ON button       
     if (output26State=="off") {
-      response->println("<p><a href=\"/?26=on\"><button class=\"button button2\">ON</button></a></p>");
+      response->println("<p><a href=\"/led?26=on\"><button class=\"button button2\">ON</button></a></p>");
     } else {
-      response->println("<p><a href=\"/?26=off\"><button class=\"button\">OFF</button></a></p>");
+      response->println("<p><a href=\"/led?26=off\"><button class=\"button\">OFF</button></a></p>");
     } 
     response->println("<p>RED 27 - State " + output27State + "</p>");
     if (output27State=="off") {
-      response->println("<p><a href=\"/?27=on\"><button class=\"button button2\">ON</button></a></p>");
+      response->println("<p><a href=\"/led?27=on\"><button class=\"button button2\">ON</button></a></p>");
     } else {
-      response->println("<p><a href=\"/?27=off\"><button class=\"button\">OFF</button></a></p>");
+      response->println("<p><a href=\"/led?27=off\"><button class=\"button\">OFF</button></a></p>");
     } 
     response->println("</body></html>");
     request->send(response);
   });
 
-  server.on("/chat", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     if (request->hasParam("text")) {
       Serial.print(request->client()->remoteIP());
       Serial.print("\t");
